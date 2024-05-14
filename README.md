@@ -2,6 +2,8 @@
 
 An installer of [MoonBit language][moonbitlang] toolchain, directly inspired by '[rust-lang/rustup][rustup]'.
 
+![MultiMoon logo](./multimoon.svg)
+
  > This is a [Lone Outpost Tech Open Source](https://github.com/lone-outpost-oss) project.
 
 ## Installation
