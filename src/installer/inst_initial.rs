@@ -201,6 +201,38 @@ impl Installer for InstInitial {
                 }
             }
         }
+
+        // set times of files and directories (best effort)
+        // (first pass for files, second pass for directories)
+        {
+            for i in 0..(core_archive.len()) {
+                let (file, outpath) = match core_archive.by_index(i) {
+                    Ok(file) => match file.enclosed_name() {
+                        Some(path) => (file, lib_path.join(&path)),
+                        None => continue,
+                    },
+                    Err(_) => continue,
+                };
+                if file.is_file() {
+                    let time = filetime::FileTime::from_unix_time(timestamp_from_zipfile(file, toolchain.last_modified), 0);
+                    let _ = filetime::set_file_times(&outpath, time, time);
+                }
+            }
+            for i in 0..(core_archive.len()) {
+                let (file, outpath) = match core_archive.by_index(i) {
+                    Ok(file) => match file.enclosed_name() {
+                        Some(path) => (file, lib_path.join(&path)),
+                        None => continue,
+                    },
+                    Err(_) => continue,
+                };
+                if file.is_dir() {
+                    let time = filetime::FileTime::from_unix_time(timestamp_from_zipfile(file, toolchain.last_modified), 0);
+                    let _ = filetime::set_file_times(&outpath, time, time);
+                }
+            }
+        }
+
         println!("succesfully extracted core library.");
 
         // bundle core in moonhome/lib
@@ -238,4 +270,16 @@ impl Installer for InstInitial {
 
         Ok(())
     }
+}
+
+fn timestamp_from_zipfile(file: zip::read::ZipFile, fallback: i64) -> i64 {
+    use chrono::TimeZone;
+    let z = file.last_modified();
+    let (y, mo, d, h, mn, s) = (z.year().into(), z.month().into(), 
+        z.day().into(), z.hour().into(), z.minute().into(), z.second().into());
+    chrono::offset::Local
+        .with_ymd_and_hms(y, mo, d, h, mn, s)
+        .earliest()
+        .map(|t| t.timestamp())
+        .unwrap_or(fallback)
 }
