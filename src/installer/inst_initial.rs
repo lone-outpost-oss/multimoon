@@ -295,7 +295,25 @@ fn timestamp_from_zipfile(file: zip::read::ZipFile, fallback: i64) -> i64 {
 fn add_path_to_shell<P: AsRef<std::path::Path>>(path: P) -> Result<()> {
     #[cfg(windows)]
     {
-        todo!("not implemented for windows yet")
+        use winreg::{enums::*, RegKey};
+        let path_str = path.as_ref().to_str().context("unsupported path name")?;
+
+        const ERR_READ: &'static str = "cannot read registry";
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let env = hkcu.open_subkey_with_flags("Environment", KEY_QUERY_VALUE | KEY_SET_VALUE)
+            .context(ERR_READ)?;
+        let path = env.get_value::<String, _>("Path").context(ERR_READ)?;
+
+        if path.contains(path_str) {
+            println!("{} has already been configured in user PATH environment variable.", path_str);
+        } else {
+            println!("adding {} to user PATH environment variable", path_str);
+            const ERR_WRITE: &'static str = "cannot write registry";
+            let path_new = format!("{};{}", path_str, &path);
+            env.set_value("Path", &path_new).context(ERR_WRITE)?;
+        }
+
+        Ok(())
     }
 
     #[cfg(unix)]
