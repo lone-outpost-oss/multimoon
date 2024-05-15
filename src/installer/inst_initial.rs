@@ -28,8 +28,19 @@ impl Installer for InstInitial {
             }
 
             let localpath = moonhome.join("bin").join(&binary.filename);
-            let localfile = std::fs::read(&localpath)
-                .with_context(|| { format!("error reading file {}", binary.filename) })?;
+            let localfile = match std::fs::read(&localpath) {
+                Ok(content) => content,
+                Err(err) => match err.kind() {
+                    std::io::ErrorKind::NotFound => { 
+                        return Ok(false); // doesn't match if some binary files missing
+                    },
+                    _ => { 
+                        let e = Into::<anyhow::Error>::into(err)
+                            .context(format!("error reading file {}", binary.filename));
+                        return Err(e); 
+                    }
+                },
+            };
             let hash = format!("sha256:{}", base16ct::lower::encode_string(&Sha256::digest(&localfile)));
             
             if !(binary.checksum == hash) {
