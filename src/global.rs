@@ -6,6 +6,7 @@ use std::sync::OnceLock;
 static GLOBAL: OnceLock<GlobalInfo> = OnceLock::new();
 
 pub struct GlobalInfo {
+    pub home: PathBuf,
     pub moonhome: PathBuf,
     pub registry: Url,
     pub verbose: bool,

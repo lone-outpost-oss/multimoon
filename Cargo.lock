@@ -859,6 +859,7 @@ dependencies = [
  "tempdir",
  "tokio",
  "url",
+ "winreg",
  "xz2",
  "zip",
 ]

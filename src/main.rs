@@ -8,9 +8,12 @@ mod toolchain;
 use crate::{global::GlobalInfo, prelude::*};
 
 fn init(args: &cmdline::Args) {
+    // home
+    let home = dirs::home_dir().expect("unable to detect user's home directory");
+
     // moonhome
     let moonhome = args.moonhome.as_ref().map_or_else(|| {
-        dirs::home_dir().expect("unable to detect user's home directory").join(".moon")
+        home.join(".moon")
     }, |value| {
         value.clone()
     });
@@ -25,6 +28,7 @@ fn init(args: &cmdline::Args) {
 
     global::init(move || {
         GlobalInfo {
+            home,
             moonhome,
             registry,
             verbose: args.verbose,

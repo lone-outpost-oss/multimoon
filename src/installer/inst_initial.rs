@@ -134,7 +134,7 @@ impl Installer for InstInitial {
 
         // install all binaries to moonhome/bin
         let moonhome = global().moonhome.clone();
-        let binary_path = moonhome.join("bin/");
+        let binary_path = moonhome.join("bin");
         const CORRUPT: &'static str = "(current installation may be corrupted)";
         for (index, (fileinfo, filecontent)) in binary_files.iter().enumerate() {
             let filepath = binary_path.join(&fileinfo.filename);
@@ -158,7 +158,7 @@ impl Installer for InstInitial {
         println!("succesfully installed binaries.");
 
         // extract core to moonhome/lib
-        let lib_path = moonhome.join("lib/");
+        let lib_path = moonhome.join("lib");
         println!("installing [core 1 / 1] {} ...", core_file.filename);
         let mut extracted_file_count = 0;
         for i in 0..(core_archive.len()) {
@@ -266,6 +266,14 @@ impl Installer for InstInitial {
         println!("succesfully bundled core library.");
         println!("succesfully installed libraries.");
 
+        if let Err(e) = add_path_to_shell(&binary_path) {
+            println!("error adding moonbit bin path {} to current shell config: {}",
+                binary_path.display(),
+                e
+            );
+            println!(" (you may have to add to your PATH manually)");
+        }
+
         println!("sucessfully installed toolchain {}.", &toolchain.name);
 
         Ok(())
@@ -282,4 +290,47 @@ fn timestamp_from_zipfile(file: zip::read::ZipFile, fallback: i64) -> i64 {
         .earliest()
         .map(|t| t.timestamp())
         .unwrap_or(fallback)
+}
+
+fn add_path_to_shell<P: AsRef<std::path::Path>>(path: P) -> Result<()> {
+    #[cfg(windows)]
+    {
+        todo!("not implemented for windows yet")
+    }
+
+    #[cfg(unix)]
+    {
+        let path_str = path.as_ref().to_str().context("unsupported path name")?;
+
+        const ERR_DETECT: &'static str = "cannot detect current shell";
+        let shell_path = PathBuf::from(std::env::var("SHELL").context(ERR_DETECT)?);
+        let shell_filename = shell_path.file_name().context(ERR_DETECT)?.to_str().context(ERR_DETECT)?;
+        let shell_config_path = global().home.join(match shell_filename {
+            "bash" => ".bashrc",
+            "zsh" => ".zshrc",
+            "fish" => ".config/fish/config.fish",
+            _ => ".profile",
+        });
+        let shell_config_path_str = shell_config_path.to_str().context("unsupported path name")?;
+
+        const ERR_READ: &'static str = "cannot read shell config file";
+        let mut shell_config_content = std::fs::read_to_string(&shell_config_path).context(ERR_READ)?;
+
+        if shell_config_content.contains(path_str) {
+            println!("{} has already been configured in PATH of shell config {}.", path_str, shell_config_path_str);
+        } else {
+            println!("adding {} to the PATH of current shell config: {}", path_str, shell_config_path_str);
+            const ERR_WRITE: &'static str = "cannot write shell config file";
+            shell_config_content.push('\n');
+            shell_config_content.push_str(&format!("export PATH=\"{}:$PATH\"\n", path_str));
+            std::fs::write(&shell_config_path, &shell_config_content).context(ERR_WRITE)?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(any(windows, unix)))]
+    {
+        compile_error!("unsupported platform")
+    }
 }
