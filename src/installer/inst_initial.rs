@@ -168,9 +168,20 @@ impl Installer for InstInitial {
         }
         println!("succesfully installed binaries.");
 
-        // extract core to moonhome/lib
-        let lib_path = moonhome.join("lib");
+        // removing old core in moonhome/lib
         println!("installing [core 1 / 1] {} ...", core_file.filename);
+        let lib_path = moonhome.join("lib");
+        let lib_core_path = lib_path.join("core");
+        
+        println!("removing old core in {} ...", lib_core_path.display());
+        if let Err(err) = std::fs::remove_dir_all(&lib_core_path) {
+            if !(err.kind() == std::io::ErrorKind::NotFound) {
+                return Err(err.into());
+            }
+        }
+        std::fs::create_dir_all(&lib_core_path)?;
+
+        // extract core to moonhome/lib
         let mut extracted_file_count = 0;
         for i in 0..(core_archive.len()) {
             let mut file = core_archive.by_index(i)
@@ -179,6 +190,10 @@ impl Installer for InstInitial {
                 Some(path) => lib_path.join(&path),
                 None => continue,
             };
+            if !outpath.starts_with(&lib_core_path) {
+                return Err(anyhow!("extract error: extracted path {} is not within core path {}! (invalid core archive?) {}", 
+                    outpath.display(), lib_core_path.display(), CORRUPT));
+            }
 
             if file.is_dir() {
                 std::fs::create_dir_all(&outpath)

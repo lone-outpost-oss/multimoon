@@ -75,9 +75,10 @@ pub async fn update_to_latest() -> Result<()> {
     let latest_installer = installer::get_installer(&latest_toolchain.installer)?;
     let matches = latest_installer.matches(latest_toolchain).await?;
     if matches {
-        println!("current installed toolchain is already latest version ({})", latest_toolchain.name);
+        println!("current installed toolchain is already latest version ({})", &latest_toolchain.name);
         return Ok(());
     } else {
+        println!("updating toolchain to latest version {} [{}]", &latest_toolchain.name, &latest_toolchain.moonver);
         latest_installer.install(&registry, latest_toolchain).await?;
         return Ok(());
     }
@@ -103,9 +104,10 @@ pub async fn update(args: &crate::cmdline::ToolchainUpdateArgs) -> Result<()> {
     let installer = installer::get_installer(&toolchain.installer)?;
     let matches = installer.matches(toolchain).await?;
     if matches && (!args.force) {
-        println!("current installed toolchain is already {}. (add --force to reinstall)", toolchain.name);
+        println!("current installed toolchain is already {}. (add --force to reinstall)", &toolchain.name);
         return Ok(());
     } else {
+        println!("installing toolchain {} [{}]", &toolchain.name, &toolchain.moonver);
         installer.install(&registry, toolchain).await?;
         return Ok(());
     }
