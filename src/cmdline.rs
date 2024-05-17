@@ -26,6 +26,10 @@ pub struct Args {
     #[arg(long)]
     pub moonhome: Option<PathBuf>,
 
+    /// Specify data storage location of MultiMoon. (default to `.multimoon` in the user home directory)
+    #[arg(long)]
+    pub multimoonhome: Option<PathBuf>,
+
     /// Verbose output.
     #[arg(short, long)]
     pub verbose: bool,
@@ -89,8 +93,7 @@ pub struct ToolchainUpdateArgs {
     pub force: bool,
 }
 
-
-/// Argument for `toolchain`.
+/// Argument for `core`.
 #[derive(Parser, Debug)]
 #[command()]
 pub struct CoreArgs {
@@ -103,9 +106,6 @@ pub struct CoreArgs {
 /// Second level subcommand for `core`.
 #[derive(Subcommand, Debug)]
 pub enum CoreCommand {
-    /// Show current MoonBit core library.
-    Show,
-
     /// Use MoonBit core library from a local path.
     Use,
 
@@ -116,11 +116,28 @@ pub enum CoreCommand {
     Rollback,
 
     /// Backup current MoonBit core library.
-    Backup,
+    Backup(CoreBackupArgs),
 
     /// Restore a backup of MoonBit core library.
-    Restore,
+    Restore(CoreRestoreArgs),
 }
+
+/// Argument for `core backup`.
+#[derive(Parser, Debug)]
+#[command()]
+pub struct CoreBackupArgs {
+    /// Backup name. (defaults to current date and time)
+    pub name: Option<String>,
+}
+
+/// Argument for `core restore`.
+#[derive(Parser, Debug)]
+#[command()]
+pub struct CoreRestoreArgs {
+    /// Restore name. (defaults to current date and time)
+    pub name: Option<String>,
+}
+
 
 const CLAP_HELP_TEMPLATE: &'static str = "{before-help}{about-with-newline}
 Presented by {author-with-newline}

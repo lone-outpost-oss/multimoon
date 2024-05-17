@@ -1,9 +1,10 @@
 mod cmdline;
+mod core;
 mod global;
 mod installer;
 mod prelude;
 mod registry;
-mod toolchain;
+mod subcommand;
 
 use crate::{global::GlobalInfo, prelude::*};
 
@@ -14,6 +15,13 @@ fn init(args: &cmdline::Args) {
     // moonhome
     let moonhome = args.moonhome.as_ref().map_or_else(|| {
         home.join(".moon")
+    }, |value| {
+        value.clone()
+    });
+
+    // multimoonhome
+    let multimoonhome = args.multimoonhome.as_ref().map_or_else(|| {
+        home.join(".multimoon")
     }, |value| {
         value.clone()
     });
@@ -29,6 +37,7 @@ fn init(args: &cmdline::Args) {
     global::init(move || {
         GlobalInfo {
             home,
+            multimoonhome,
             moonhome,
             registry,
             verbose: args.verbose,
@@ -39,6 +48,7 @@ fn init(args: &cmdline::Args) {
 #[tokio::main]
 async fn main() -> Result<()> {
     use clap::Parser;
+    use subcommand::{core, toolchain};
     let args = cmdline::Args::parse();
 
     init(&args);
@@ -50,13 +60,24 @@ async fn main() -> Result<()> {
             match &args.command {
                 cmdline::ToolchainCommand::Show => toolchain::show().await,
                 cmdline::ToolchainCommand::List => toolchain::list().await,
-                cmdline::ToolchainCommand::Update(args) => toolchain::update(args).await,
-                cmdline::ToolchainCommand::Rollback(args) => toolchain::update(args).await,
+                cmdline::ToolchainCommand::Update(a) => toolchain::update(a).await,
+                cmdline::ToolchainCommand::Rollback(a) => toolchain::update(a).await,
             }
         },
-        cmdline::Command::Core(_) => todo!(),
+        cmdline::Command::Core(args) => {
+            match &args.command {
+                cmdline::CoreCommand::Use => todo!(),
+                cmdline::CoreCommand::Update => todo!(),
+                cmdline::CoreCommand::Rollback => todo!(),
+                cmdline::CoreCommand::Backup(a) => core::backup(a).await,
+                cmdline::CoreCommand::Restore(a) => core::restore(a).await,
+            }
+        },
         cmdline::Command::UpdateSelf => update_self().await,
-    }
+    }.map_err(|e| {
+        // println!("Error backtrace: {:?}", e.backtrace());
+        e
+    })
 }
 
 async fn update_self() -> Result<()> {

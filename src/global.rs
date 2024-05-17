@@ -7,6 +7,7 @@ static GLOBAL: OnceLock<GlobalInfo> = OnceLock::new();
 
 pub struct GlobalInfo {
     pub home: PathBuf,
+    pub multimoonhome: PathBuf,
     pub moonhome: PathBuf,
     pub registry: Url,
     pub verbose: bool,
