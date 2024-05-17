@@ -15,6 +15,7 @@ pub struct Registry
 pub struct Toolchain
 {
     pub name: String,
+    pub moonver: String,
     pub last_modified: i64,
     pub bin: Vec<File>,
     pub core: Vec<File>,

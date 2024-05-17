@@ -47,7 +47,7 @@ pub async fn list() -> Result<()> {
         let installer = installer::get_installer(&toolchain.installer)?;
         let matches = installer.matches(toolchain).await?;
         
-        print.push(format!("{} toolchain{}", &toolchain.name, if matches { " (current)" } else { "" }));
+        print.push(format!("{}{} [{}]", &toolchain.name, if matches { " (current)" } else { "" }, &toolchain.moonver));
     }
 
     for print_line in print {
