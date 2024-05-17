@@ -17,7 +17,7 @@ pub async fn show() -> Result<()> {
     toolchains.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
 
     for toolchain in &toolchains {
-        let installer = installer::get_installer(&toolchain.name)?;
+        let installer = installer::get_installer(&toolchain.installer)?;
         if installer.matches(toolchain).await? {
             println!("using {} toolchain.", &toolchain.name);
             return Ok(())
@@ -44,7 +44,7 @@ pub async fn list() -> Result<()> {
 
     let mut print = vec![];
     for toolchain in &toolchains {
-        let installer = installer::get_installer(&toolchain.name)?;
+        let installer = installer::get_installer(&toolchain.installer)?;
         let matches = installer.matches(toolchain).await?;
         
         print.push(format!("{} toolchain{}", &toolchain.name, if matches { " (current)" } else { "" }));
@@ -72,7 +72,7 @@ pub async fn update_to_latest() -> Result<()> {
     let latest_toolchain = &toolchains[0];
 
     // check if latest, install if not
-    let latest_installer = installer::get_installer(&latest_toolchain.name)?;
+    let latest_installer = installer::get_installer(&latest_toolchain.installer)?;
     let matches = latest_installer.matches(latest_toolchain).await?;
     if matches {
         println!("current installed toolchain is already latest version ({})", latest_toolchain.name);
@@ -100,7 +100,7 @@ pub async fn update(args: &crate::cmdline::ToolchainUpdateArgs) -> Result<()> {
     };
 
     // check if latest, install if not
-    let installer = installer::get_installer(&toolchain.name)?;
+    let installer = installer::get_installer(&toolchain.installer)?;
     let matches = installer.matches(toolchain).await?;
     if matches && (!args.force) {
         println!("current installed toolchain is already {}. (add --force to reinstall)", toolchain.name);
