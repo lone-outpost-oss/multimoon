@@ -106,14 +106,8 @@ pub struct CoreArgs {
 /// Second level subcommand for `core`.
 #[derive(Subcommand, Debug)]
 pub enum CoreCommand {
-    /// Use MoonBit core library from a local path.
-    Use,
-
-    /// Update MoonBit core library to latest or any specified version.
-    Update,
-
-    /// Rollback MoonBit core library to any specified version. (same as update)
-    Rollback,
+    /// List all backups.
+    List,
 
     /// Backup current MoonBit core library.
     Backup(CoreBackupArgs),
@@ -134,8 +128,8 @@ pub struct CoreBackupArgs {
 #[derive(Parser, Debug)]
 #[command()]
 pub struct CoreRestoreArgs {
-    /// Restore name. (defaults to current date and time)
-    pub name: Option<String>,
+    /// Restore name.
+    pub name: String,
 }
 
 

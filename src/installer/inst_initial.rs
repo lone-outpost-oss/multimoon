@@ -182,83 +182,9 @@ impl Installer for InstInitial {
         std::fs::create_dir_all(&lib_core_path)?;
 
         // extract core to moonhome/lib
-        let mut extracted_file_count = 0;
-        for i in 0..(core_archive.len()) {
-            let mut file = core_archive.by_index(i)
-                .with_context(|| format!("extract error: failed to read file #{} from archive {}", i, CORRUPT))?;
-            let outpath = match file.enclosed_name() {
-                Some(path) => lib_path.join(&path),
-                None => continue,
-            };
-            if !outpath.starts_with(&lib_core_path) {
-                return Err(anyhow!("extract error: extracted path {} is not within core path {}! (invalid core archive?) {}", 
-                    outpath.display(), lib_core_path.display(), CORRUPT));
-            }
-
-            if file.is_dir() {
-                std::fs::create_dir_all(&outpath)
-                    .with_context(|| format!("extract error: failed to create {} {}", outpath.display(), CORRUPT))?;
-            } else {
-                if let Some(p) = outpath.parent() {
-                    if !p.exists() {
-                        std::fs::create_dir_all(p)
-                            .with_context(|| format!("extract error: failed to create {} {}", outpath.display(), CORRUPT))?
-                    }
-                }
-                if global().verbose || extracted_file_count < 5 {
-                    println!("extract to {}", outpath.display());
-                } else if (!global().verbose) && extracted_file_count == 5 {
-                    println!(" (further extracted files omitted)");
-                }
-                let mut outfile = std::fs::File::create(&outpath)
-                    .with_context(|| format!("extract error: failed to create {} {}", outpath.display(), CORRUPT))?;
-                std::io::copy(&mut file, &mut outfile)
-                    .with_context(|| format!("extract error: failed to write {} {}", outpath.display(), CORRUPT))?;
-
-                extracted_file_count += 1;
-            }
-
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                if let Some(mode) = file.unix_mode() {
-                    std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))
-                    .with_context(|| format!("extract error: failed to set permission to {} {}", outpath.display(), CORRUPT))?;
-                }
-            }
-        }
-
-        // set times of files and directories (best effort)
-        // (first pass for files, second pass for directories)
-        {
-            for i in 0..(core_archive.len()) {
-                let (file, outpath) = match core_archive.by_index(i) {
-                    Ok(file) => match file.enclosed_name() {
-                        Some(path) => (file, lib_path.join(&path)),
-                        None => continue,
-                    },
-                    Err(_) => continue,
-                };
-                if file.is_file() {
-                    let time = filetime::FileTime::from_unix_time(timestamp_from_zipfile(file, toolchain.last_modified), 0);
-                    let _ = filetime::set_file_times(&outpath, time, time);
-                }
-            }
-            for i in 0..(core_archive.len()) {
-                let (file, outpath) = match core_archive.by_index(i) {
-                    Ok(file) => match file.enclosed_name() {
-                        Some(path) => (file, lib_path.join(&path)),
-                        None => continue,
-                    },
-                    Err(_) => continue,
-                };
-                if file.is_dir() {
-                    let time = filetime::FileTime::from_unix_time(timestamp_from_zipfile(file, toolchain.last_modified), 0);
-                    let _ = filetime::set_file_times(&outpath, time, time);
-                }
-            }
-        }
-
+        crate::core::extract_verbose(&lib_path, &mut core_archive, &(crate::core::ExtractOptions {
+            fallback_timestamp: toolchain.last_modified
+        })).await?;
         println!("succesfully extracted core library.");
 
         // bundle core in moonhome/lib
@@ -304,18 +230,6 @@ impl Installer for InstInitial {
 
         Ok(())
     }
-}
-
-fn timestamp_from_zipfile(file: zip::read::ZipFile, fallback: i64) -> i64 {
-    use chrono::TimeZone;
-    let z = file.last_modified();
-    let (y, mo, d, h, mn, s) = (z.year().into(), z.month().into(), 
-        z.day().into(), z.hour().into(), z.minute().into(), z.second().into());
-    chrono::offset::Local
-        .with_ymd_and_hms(y, mo, d, h, mn, s)
-        .earliest()
-        .map(|t| t.timestamp())
-        .unwrap_or(fallback)
 }
 
 fn add_path_to_shell<P: AsRef<std::path::Path>>(path: P) -> Result<()> {

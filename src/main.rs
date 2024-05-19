@@ -1,4 +1,5 @@
 mod cmdline;
+mod common;
 mod core;
 mod global;
 mod installer;
@@ -66,9 +67,7 @@ async fn main() -> Result<()> {
         },
         cmdline::Command::Core(args) => {
             match &args.command {
-                cmdline::CoreCommand::Use => todo!(),
-                cmdline::CoreCommand::Update => todo!(),
-                cmdline::CoreCommand::Rollback => todo!(),
+                cmdline::CoreCommand::List => core::list().await,
                 cmdline::CoreCommand::Backup(a) => core::backup(a).await,
                 cmdline::CoreCommand::Restore(a) => core::restore(a).await,
             }

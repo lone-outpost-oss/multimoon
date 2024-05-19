@@ -1,6 +1,14 @@
 //! Subcommands under core.
 
-use crate::{core::archive, prelude::*};
+use crate::{core::{archive, core_backups_path, extract}, prelude::*};
+
+pub async fn list() -> Result<()> {
+    let result = crate::core::list().await?;
+    for item in result {
+        println!("{}", item);
+    }
+    Ok(())
+}
 
 pub async fn backup(args: &crate::cmdline::CoreBackupArgs) -> Result<()> {
     use std::io::Seek;
@@ -16,7 +24,7 @@ pub async fn backup(args: &crate::cmdline::CoreBackupArgs) -> Result<()> {
     // backup name, specified or automatically generated
     let backup_name = std::iter::once(args.name.clone().unwrap_or_else(|| {
         let datetime = chrono::Local::now();
-        datetime.format("%Y-%m-%d-%H_%M_%S").to_string()
+        datetime.format("%Y%m%d-%H%M%S").to_string()
     })).map(|s| {
         s.strip_suffix(".zip").map(|rest| rest.to_string()).unwrap_or(s)
     }).next().unwrap();
@@ -32,8 +40,26 @@ pub async fn backup(args: &crate::cmdline::CoreBackupArgs) -> Result<()> {
     Ok(())
 }
 
-pub async fn restore(_args: &crate::cmdline::CoreRestoreArgs) -> Result<()> {
-    todo!()
+pub async fn restore(args: &crate::cmdline::CoreRestoreArgs) -> Result<()> {
+    println!("MoonBit homedir: {}", global().moonhome.display());
+    use_multimoon_home().await?;
+    
+    // load zip archive from disk
+    let backup_name = std::iter::once(args.name.clone()).map(|s| {
+        s.strip_suffix(".zip").map(|rest| rest.to_string()).unwrap_or(s)
+    }).next().unwrap();
+    let read_path = core_backups_path().join(format!("{}.zip", &backup_name));
+    println!("reading backup file {}", read_path.display());
+    let archive_file = std::fs::File::open(&read_path)?;
+    let mut archive = zip::ZipArchive::new(archive_file)?;
+
+    let lib_path = global().moonhome.join("lib");
+    println!("extracting core to lib path {}", lib_path.display());
+    extract(lib_path, &mut archive).await?;
+
+    println!("core restored from backup {}.", &backup_name);
+
+    Ok(())
 }
 
 async fn use_multimoon_home() -> Result<()> {
@@ -43,8 +69,4 @@ async fn use_multimoon_home() -> Result<()> {
     let core_backups_path = multimoonhome.join("core-backups");
     std::fs::create_dir_all(&core_backups_path)?;
     Ok(())
-}
-
-fn core_backups_path() -> PathBuf {
-    global().multimoonhome.as_path().join("core-backups")
 }

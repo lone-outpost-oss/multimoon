@@ -1,10 +1,21 @@
 //! Operations for installing core library.
 
 use walkdir::WalkDir;
-use std::io::{Cursor, Read, Write};
+use std::{io::{Cursor, Read, Seek, Write}, time::UNIX_EPOCH};
 use anyhow::Context;
 
 use crate::prelude::*;
+
+#[derive(Clone, Debug)]
+pub struct ExtractOptions {
+    pub fallback_timestamp: i64,
+}
+
+impl Default for ExtractOptions {
+    fn default() -> Self {
+        Self { fallback_timestamp: chrono::Utc::now().timestamp() }
+    }
+}
 
 pub async fn archive<P: AsRef<Path>>(lib_path: P) -> Result<zip::ZipArchive<Cursor<Vec<u8>>>> {
     let lib_path = lib_path.as_ref();
@@ -27,7 +38,7 @@ pub async fn archive<P: AsRef<Path>>(lib_path: P) -> Result<zip::ZipArchive<Curs
 
     let ignore_target_path = PathBuf::from("core").join("target");
     let mut archived_count = 0;
-    let walk = WalkDir::new(lib_core_path);
+    let walk = WalkDir::new(lib_core_path).sort_by_file_name();
     for entry in walk {
         let entry = entry?;
         let path_abs = entry.path();
@@ -85,3 +96,139 @@ pub async fn archive<P: AsRef<Path>>(lib_path: P) -> Result<zip::ZipArchive<Curs
     Ok(zip_buf)
 }
 
+pub async fn extract_verbose<P, R>(lib_path: P, archive: &mut zip::ZipArchive<R>, options: &ExtractOptions) -> Result<()>
+    where P: AsRef<Path>, R: Read + Seek
+{
+    use crate::common::timestamp_from_zipfile;
+    const CORRUPT: &'static str = "(current installation may be corrupted)";
+    let lib_path = lib_path.as_ref();
+    let lib_core_path = lib_path.join("core");
+
+    let mut extracted_file_count = 0;
+    for i in 0..(archive.len()) {
+        let mut file = archive.by_index(i)
+            .with_context(|| format!("extract error: failed to read file #{} from archive {}", i, CORRUPT))?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => lib_path.join(&path),
+            None => continue,
+        };
+        if !outpath.starts_with(&lib_core_path) {
+            return Err(anyhow!("extract error: extracted path {} is not within core path {}! (invalid core archive?) {}", 
+                outpath.display(), lib_core_path.display(), CORRUPT));
+        }
+
+        if file.is_dir() {
+            std::fs::create_dir_all(&outpath)
+                .with_context(|| format!("extract error: failed to create {} {}", outpath.display(), CORRUPT))?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    std::fs::create_dir_all(p)
+                        .with_context(|| format!("extract error: failed to create {} {}", outpath.display(), CORRUPT))?
+                }
+            }
+            if global().verbose || extracted_file_count < 5 {
+                println!("extract to {}", outpath.display());
+            } else if (!global().verbose) && extracted_file_count == 5 {
+                println!(" (further extracted files omitted)");
+            }
+            let mut outfile = std::fs::File::create(&outpath)
+                .with_context(|| format!("extract error: failed to create {} {}", outpath.display(), CORRUPT))?;
+            std::io::copy(&mut file, &mut outfile)
+                .with_context(|| format!("extract error: failed to write {} {}", outpath.display(), CORRUPT))?;
+
+            extracted_file_count += 1;
+        }
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Some(mode) = file.unix_mode() {
+                std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))
+                .with_context(|| format!("extract error: failed to set permission to {} {}", outpath.display(), CORRUPT))?;
+            }
+        }
+    }
+
+    // set times of files and directories (best effort)
+    // (first pass for files, second pass for directories)
+    {
+        for i in 0..(archive.len()) {
+            let (file, outpath) = match archive.by_index(i) {
+                Ok(file) => match file.enclosed_name() {
+                    Some(path) => (file, lib_path.join(&path)),
+                    None => continue,
+                },
+                Err(_) => continue,
+            };
+            if file.is_file() {
+                let time = filetime::FileTime::from_unix_time(timestamp_from_zipfile(file, options.fallback_timestamp), 0);
+                let _ = filetime::set_file_times(&outpath, time, time);
+            }
+        }
+        for i in 0..(archive.len()) {
+            let (file, outpath) = match archive.by_index(i) {
+                Ok(file) => match file.enclosed_name() {
+                    Some(path) => (file, lib_path.join(&path)),
+                    None => continue,
+                },
+                Err(_) => continue,
+            };
+            if file.is_dir() {
+                let time = filetime::FileTime::from_unix_time(timestamp_from_zipfile(file, options.fallback_timestamp), 0);
+                let _ = filetime::set_file_times(&outpath, time, time);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn list() -> Result<Vec<String>> {
+    fn process_direntry(entry: Result<std::fs::DirEntry, std::io::Error>) -> Result<Option<(String, i64)>> {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        if file_type.is_file() {
+            let file_name = entry.file_name().into_string()
+                .map_err(|osstr| anyhow!("unsupported file name {}", osstr.to_string_lossy()))?;
+            if let Some(backup_name) = file_name.strip_suffix(".zip") {
+                let timestamp = entry.metadata().ok()
+                    .and_then(|metadata| metadata.modified().ok())
+                    .and_then(|systime| systime.duration_since(UNIX_EPOCH).ok())
+                    .map(|duration| duration.as_secs() as i64)
+                    .unwrap_or(0);
+                let disp_name = format!("{}", backup_name);
+                return Ok(Some((disp_name, timestamp)));
+            }
+        }
+        Ok(None)
+    }
+
+    let mut result = vec![];
+    let readdir = std::fs::read_dir(core_backups_path())?;
+    for entry in readdir {
+        match process_direntry(entry) {
+            Ok(Some(backup_name)) => {
+                result.push(backup_name);
+            },
+            Ok(None) => (),
+            Err(err) => {
+                println!("ignoring a file due to error: {}", err)
+            },
+        }
+    }
+    result.sort_by(|a, b| a.1.cmp(&b.1));
+    
+    Ok(result.into_iter().map(|(filename, _)| filename).collect())
+}
+
+#[inline(always)]
+pub async fn extract<P, R>(lib_path: P, archive: &mut zip::ZipArchive<R>) -> Result<()>
+    where P: AsRef<Path>, R: Read + Seek
+{
+    extract_verbose(lib_path, archive, &(ExtractOptions::default())).await
+}
+
+pub fn core_backups_path() -> PathBuf {
+    global().multimoonhome.as_path().join("core-backups")
+}
