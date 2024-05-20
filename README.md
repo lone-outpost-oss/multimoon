@@ -1,5 +1,7 @@
 # multimoon
 
+![Crates.io Version](https://img.shields.io/crates/v/multimoon) ![GitHub Repo stars](https://img.shields.io/github/stars/lone-outpost-oss/multimoon)
+
 An installer of [MoonBit language][moonbitlang] toolchain, directly inspired by '[rust-lang/rustup][rustup]'.
 
 ![MultiMoon logo](./multimoon.svg)
