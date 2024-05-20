@@ -47,7 +47,6 @@ multimoon toolchain update 0.1.20240513
 Use, backup and restore the core library: (basically used in core development)
 
 ```shell
-multimoon core use ./path-to-my-core-repository-path
 multimoon core backup my-core-dev-1
 multimoon core restore my-core-dev-1
 ```
