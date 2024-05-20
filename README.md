@@ -41,7 +41,7 @@ multimoon update
 Revert to an old version of toolchain:
 
 ```shell
-multimoon toolchain update 2024-05-07
+multimoon toolchain update 0.1.20240513
 ```
 
 Use, backup and restore the core library: (basically used in core development)
