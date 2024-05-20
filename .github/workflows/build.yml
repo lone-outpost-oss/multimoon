@@ -1,0 +1,90 @@
+name: Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ubuntu_amd64:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: multimoon
+
+      - name: Build rust project
+        working-directory: ./multimoon
+        run: |
+          sudo apt-get install musl-tools
+          rustup target add x86_64-unknown-linux-musl
+          cargo build --release --target=x86_64-unknown-linux-musl
+
+      - name: Archive release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: multimoon-ubuntu_amd64
+          path: multimoon/target/x86_64-unknown-linux-musl/release/multimoon
+          retention-days: 7
+
+  macos_aarch64:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: multimoon
+
+      - name: Build rust project
+        working-directory: ./multimoon
+        run: |
+          rustup target add aarch64-apple-darwin
+          cargo build --release --target=aarch64-apple-darwin
+
+      - name: Archive release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: multimoon-macos_aarch64
+          path: multimoon/target/aarch64-apple-darwin/release/multimoon
+          retention-days: 7
+
+  macos_amd64:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: multimoon
+
+      - name: Build rust project
+        working-directory: ./multimoon
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo build --release --target=x86_64-apple-darwin
+
+      - name: Archive release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: multimoon-macos_amd64
+          path: multimoon/target/x86_64-apple-darwin/release/multimoon
+          retention-days: 7
+
+  windows_x64:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: multimoon
+
+      - name: Build rust project
+        working-directory: ./multimoon
+        run: |
+          rustup target add x86_64-pc-windows-msvc
+          cargo build --release --target=x86_64-pc-windows-msvc
+
+      - name: Archive release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: multimoon-windows_x64
+          path: multimoon/target/x86_64-pc-windows-msvc/release/multimoon.exe
+          retention-days: 7
