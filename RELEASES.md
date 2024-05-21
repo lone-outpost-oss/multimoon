@@ -1,3 +1,8 @@
+MultiMoon Version 0.1.1 (2024-05-21)
+===============================
+
+ - fix: failed to create `.moon/bin` and `.moon/lib` on fresh new installations
+
 MultiMoon Version 0.1.0 (2024-05-20)
 ===============================
 
