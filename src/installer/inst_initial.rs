@@ -77,14 +77,16 @@ impl Installer for InstInitial {
                     &url,
                 );
                 let download_start = std::time::Instant::now();
-                let response = client.get(url).send().await?.error_for_status()?;
+                let response = client.get(url.clone()).send().await?.error_for_status()?;
                 let download_duration = download_start.elapsed();
                 let compressed = response.bytes().await?;
                 
                 // xz decompress
                 let mut xzdecoder = xz2::bufread::XzDecoder::new(&compressed[..]);
                 let mut filecontent = vec![];
-                xzdecoder.read_to_end(&mut filecontent)?;
+                xzdecoder.read_to_end(&mut filecontent).with_context(|| {
+                    anyhow!("error reading xz archive {}", &url)
+                })?;
 
                 // check checksum
                 let hash = format!("sha256:{}", base16ct::lower::encode_string(&Sha256::digest(&filecontent)));
@@ -146,6 +148,7 @@ impl Installer for InstInitial {
         // install all binaries to moonhome/bin
         let moonhome = global().moonhome.clone();
         let binary_path = moonhome.join("bin");
+        std::fs::create_dir_all(&binary_path)?;
         const CORRUPT: &'static str = "(current installation may be corrupted)";
         for (index, (fileinfo, filecontent)) in binary_files.iter().enumerate() {
             let filepath = binary_path.join(&fileinfo.filename);
@@ -171,6 +174,7 @@ impl Installer for InstInitial {
         // removing old core in moonhome/lib
         println!("installing [core 1 / 1] {} ...", core_file.filename);
         let lib_path = moonhome.join("lib");
+        std::fs::create_dir_all(&lib_path)?;
         let lib_core_path = lib_path.join("core");
         
         println!("removing old core in {} ...", lib_core_path.display());
