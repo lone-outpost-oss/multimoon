@@ -1,6 +1,6 @@
 [package]
 name = "multimoon"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Lone Outpost Tech <oss@loneoutpost.cn>"]
 description = "MultiMoon - an installer of MoonBit language toolchain."
