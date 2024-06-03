@@ -1,3 +1,8 @@
+MultiMoon Version 0.1.2 (2024-05-30)
+===============================
+
+ - fix: upgrade yanked `zip` v1.x package to avoid errors on `cargo install multimoon` without `--locked` parameter. 
+
 MultiMoon Version 0.1.1 (2024-05-21)
 ===============================
 
